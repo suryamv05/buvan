@@ -1,0 +1,71 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks-and-smoke:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16.15-bookworm
+        env:
+          POSTGRES_DB: valorant_test
+          POSTGRES_USER: postgres_admin
+          POSTGRES_PASSWORD: test_bootstrap_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres_admin -d valorant_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENVIRONMENT: development
+      POSTGRES_DB: valorant_test
+      POSTGRES_BOOTSTRAP_USER: postgres_admin
+      POSTGRES_BOOTSTRAP_PASSWORD: test_bootstrap_password
+      APP_DB_USER: valorant_app
+      APP_DB_PASSWORD: test_app_password
+      REDIS_PASSWORD: test_redis_password
+      RABBITMQ_USER: valorant_worker
+      RABBITMQ_PASSWORD: test_rabbit_password
+      MINIO_ROOT_USER: valorant_storage
+      MINIO_ROOT_PASSWORD: test_storage_password
+      JWT_SECRET: test_jwt_secret_0123456789012345678901234567890123456789012345678901
+      REALTIME_JWT_SECRET: test_realtime_secret_012345678901234567890123456789012345678901234567
+      DATABASE_URL: postgresql+asyncpg://postgres_admin:test_bootstrap_password@127.0.0.1:5433/valorant_test
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://postgres_admin:test_bootstrap_password@127.0.0.1:5433/valorant_test
+      REDIS_URL: redis://:test_redis_password@127.0.0.1:6379/0
+      CELERY_BROKER_URL: amqp://valorant_worker:test_rabbit_password@127.0.0.1:5672//
+      MIGRATION_TEST_DATABASE_URL: postgresql+asyncpg://postgres_admin:test_bootstrap_password@127.0.0.1:5433/valorant_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Compile hash-locked dependencies
+        working-directory: backend
+        run: |
+          python -m pip install pip-tools==7.6.2
+          pip-compile --resolver=backtracking --generate-hashes --extra dev --output-file requirements.lock pyproject.toml
+          python -m pip install --require-hashes -r requirements.lock
+      - name: Run lint, types, security audit, migration test, and unit tests
+        working-directory: backend
+        run: make check
+      - name: Create disposable smoke-test environment
+        shell: pwsh
+        run: |
+          $content = Get-Content .env.example -Raw
+          $content = [regex]::Replace($content, 'REPLACE_WITH_[A-Z0-9_]+', [System.Text.RegularExpressions.MatchEvaluator]{
+            param($match)
+            [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+          })
+          Set-Content -Path .env -Value $content -NoNewline
+      - name: Run destructive local-stack smoke test
+        shell: pwsh
+        run: ./scripts/smoke.ps1
