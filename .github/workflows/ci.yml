@@ -26,6 +26,7 @@ jobs:
           --health-retries 10
     env:
       ENVIRONMENT: development
+      RUN_INTEGRATION: "1"
       POSTGRES_DB: valorant_test
       POSTGRES_BOOTSTRAP_USER: postgres_admin
       POSTGRES_BOOTSTRAP_PASSWORD: test_bootstrap_password

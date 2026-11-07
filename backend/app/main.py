@@ -19,7 +19,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 import structlog
 
 from app.core.config import settings
-from app.core.db import engine
+from app.core.db import dispose_engine, get_engine
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestBodyLimitMiddleware
@@ -36,7 +36,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings.validate_runtime()
     yield
     await redis_client.aclose()
-    await engine.dispose()
+    await dispose_engine()
 
 
 app = FastAPI(title="VALORANT Strategy API", version="0.1.0", docs_url=None,
@@ -70,6 +70,7 @@ if settings.enable_docs:
             swagger_js_url=f"{static_url}/swagger-ui-bundle.js",
             swagger_css_url=f"{static_url}/swagger-ui.css",
             swagger_favicon_url=f"{static_url}/favicon-32x32.png",
+            swagger_ui_parameters={"validatorUrl": None},
         )
         inline_scripts = re.findall(rb"<script(?:\s[^>]*)?>(.*?)</script>", response.body, re.DOTALL)
         inline_scripts = [script for script in inline_scripts if script.strip()]
@@ -132,7 +133,7 @@ async def health() -> dict[str, str]:
 @app.get("/ready", include_in_schema=False)
 async def ready() -> JSONResponse:
     try:
-        async with engine.connect() as connection:
+        async with get_engine().connect() as connection:
             await connection.execute(select(1))
         await redis_client.ping()
     except Exception:

@@ -41,6 +41,18 @@ make check
 
 The `make` command on Windows requires GNU Make. `make install-dev` compiles a hash-locked `requirements.lock` from `pyproject.toml` and installs it. The individual checks are `ruff check app tests migrations`, `mypy app`, `bandit -c pyproject.toml -r app`, `pip-audit`, and the pytest command above.
 
+The normal pytest command uses test-only URLs and secrets from `tests/conftest.py`; it does not require Docker. Tests that need external services carry the `integration` marker and are skipped by default. To run them against the Compose stack, first start the services and set the integration database URL to the host-mapped Postgres port:
+
+```powershell
+docker compose up -d
+$env:RUN_INTEGRATION = "1"
+$bootstrapPassword = (Get-Content .env | Where-Object { $_ -match '^POSTGRES_BOOTSTRAP_PASSWORD=' }) -replace '^POSTGRES_BOOTSTRAP_PASSWORD=', ''
+$env:MIGRATION_TEST_DATABASE_URL = "postgresql+asyncpg://postgres_admin:$bootstrapPassword@127.0.0.1:5432/valorant"
+pytest -m integration
+```
+
+The Postgres URL uses the Compose bootstrap username/password and host port `5432`. Redis-dependent integration tests, if added, should use the host-mapped Redis port `6379` and its `.env` password.
+
 ## Development roadmap
 
 Work proceeds by explicit phases: strategies/storage, teams, players/ingestion/workers, analytics and final hardening. This checkout currently contains Phase 1 only.

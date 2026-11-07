@@ -36,7 +36,7 @@ def test_reject_expired_token() -> None:
 def test_reject_none_algorithm() -> None:
     now = datetime.now(UTC)
     token = jwt.encode({"sub": str(uuid4()), "iss": settings.jwt_issuer, "aud": settings.jwt_audience,
-                        "iat": now, "exp": now + timedelta(minutes=1), "jti": "abc"}, algorithm="none")
+                        "iat": now, "exp": now + timedelta(minutes=1), "jti": "abc"}, key=None, algorithm="none")
     with pytest.raises(APIError):
         verify_access_token(token)
 

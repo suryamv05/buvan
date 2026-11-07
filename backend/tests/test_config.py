@@ -12,7 +12,14 @@ def test_csv_settings_are_parsed_without_json_decoding(monkeypatch: pytest.Monke
     assert settings.trusted_hosts == ["localhost", "api"]
 
 
-def test_settings_name_missing_secret() -> None:
+def test_settings_name_missing_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "POSTGRES_DB", "POSTGRES_BOOTSTRAP_USER", "POSTGRES_BOOTSTRAP_PASSWORD",
+        "APP_DB_USER", "APP_DB_PASSWORD", "REDIS_PASSWORD", "RABBITMQ_USER",
+        "RABBITMQ_PASSWORD", "MINIO_ROOT_USER", "MINIO_ROOT_PASSWORD", "JWT_SECRET",
+        "REALTIME_JWT_SECRET", "DATABASE_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
     settings = Settings(_env_file=None)
     with pytest.raises(ValueError, match="POSTGRES_DB"):
         settings.validate_runtime()

@@ -6,14 +6,16 @@ from pathlib import Path
 import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-MIGRATION_TEST_URL = os.environ.get("MIGRATION_TEST_DATABASE_URL")
 
 
-@pytest.mark.skipif(not MIGRATION_TEST_URL, reason="requires a fresh PostgreSQL test database")
+@pytest.mark.integration
 def test_fresh_postgres_upgrade_has_no_model_drift() -> None:
+    migration_test_url = os.environ.get("MIGRATION_TEST_DATABASE_URL")
+    if not migration_test_url:
+        pytest.fail("Set MIGRATION_TEST_DATABASE_URL to the Compose PostgreSQL URL when RUN_INTEGRATION=1")
     environment = os.environ.copy()
-    environment["DATABASE_URL"] = MIGRATION_TEST_URL or ""
-    environment["MIGRATION_DATABASE_URL"] = MIGRATION_TEST_URL or ""
+    environment["DATABASE_URL"] = migration_test_url
+    environment["MIGRATION_DATABASE_URL"] = migration_test_url
     upgrade = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=BACKEND_ROOT,
